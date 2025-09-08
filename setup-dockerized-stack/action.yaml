@@ -1,0 +1,42 @@
+name: Setup Dockerized Stack
+description: Sets up a project's dockerized stack in the "normal" way for our projects
+
+inputs:
+  stack-root:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup
+      shell: bash
+      env:
+        STACK_CONFIG: ${{ github.workspace }}/stack-config.yaml
+      run: |
+        set -o errexit
+        
+        # Allow stack to use the provided stack root we're making
+        # even though it's owned by a different user
+        echo 'allow-different-user: true' >> $STACK_CONFIG
+
+        # Create a compose override file that sets up the stack
+        # environment for any scripts that the build will run to
+        # run after this setup.
+        cat <<- EOF > compose.override.yml
+        services:
+          dev:
+            environment:
+              STACK_ROOT: /stack-root
+              STACK_CONFIG: $STACK_CONFIG
+            volumes:
+              - ${{ inputs.stack-root }}:/stack-root
+        EOF
+
+        # On a build where no cache was hit, we need the stack-root
+        # directory to exist
+        mkdir -p ${{ inputs.stack-root }}
+
+        # The compose.yml files of our projects use $PROJECT_DIR to
+        # make the work dir inside the container match the path on the
+        # host.
+        echo "PROJECT_DIR=$PWD" >> .env

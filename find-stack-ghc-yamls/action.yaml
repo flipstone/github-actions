@@ -1,0 +1,20 @@
+name: Find stack.yaml files configured for specific GHC verions
+outputs:
+  stack-yamls:
+    description: The files matching stack-ghc*.yaml that were found
+    value: ${{ steps.set-output.outputs.stack-yamls }}
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set Output
+      id: set-output
+      shell: bash
+      run: |
+        shopt -s failglob
+        files=(stack-ghc*.yaml)
+        json=$(jq --null-input --compact-output '$ARGS.positional' --args "${files[@]}")
+        echo "stack-yamls=$json" >> "$GITHUB_OUTPUT"
+    

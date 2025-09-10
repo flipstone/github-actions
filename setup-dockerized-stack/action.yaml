@@ -5,19 +5,22 @@ inputs:
   stack-root:
     required: true
 
+  working-directory:
+    required: true
+    default: ${{ github.workspace }}
+
 runs:
   using: composite
   steps:
     - name: Setup
       shell: bash
-      env:
-        STACK_CONFIG: ${{ github.workspace }}/stack-config.yaml
+      working-directory: ${{ inputs.working-directory }}
       run: |
         set -o errexit
         
         # Allow stack to use the provided stack root we're making
         # even though it's owned by a different user
-        echo 'allow-different-user: true' >> $STACK_CONFIG
+        echo 'allow-different-user: true' >> ./stack-config.yaml
 
         # Create a compose override file that sets up the stack
         # environment for any scripts that the build will run to
@@ -27,9 +30,10 @@ runs:
           dev:
             environment:
               STACK_ROOT: /stack-root
-              STACK_CONFIG: $STACK_CONFIG
+              STACK_CONFIG: /stack-config.yaml
             volumes:
               - ${{ inputs.stack-root }}:/stack-root
+              - $PWD/stack-config.yaml:/stack-config.yaml
         EOF
 
         # On a build where no cache was hit, we need the stack-root

@@ -1,5 +1,10 @@
 name: Find stack.yaml files configured for specific GHC versions
 
+inputs:
+  working-directory:
+    required: true
+    default: ${{ github.workspace }}
+
 outputs:
   stack-yamls:
     description: The files matching stack-ghc*.yaml that were found
@@ -14,6 +19,7 @@ runs:
     - name: Set Output
       id: set-output
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       run: |
         set -o errexit
         shopt -s failglob

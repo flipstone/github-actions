@@ -25,7 +25,7 @@ runs:
         # Create a compose override file that sets up the stack
         # environment for any scripts that the build will run to
         # run after this setup.
-        cat <<- EOF > compose.override.yml
+        cat <<- EOF > compose.override.yaml
         services:
           dev:
             environment:
@@ -40,7 +40,7 @@ runs:
         # directory to exist
         mkdir -p ${{ inputs.stack-root }}
 
-        # The compose.yml files of our projects use $PROJECT_DIR to
+        # The compose.yaml files of our projects use $PROJECT_DIR to
         # make the work dir inside the container match the path on the
         # host.
         echo "PROJECT_DIR=$PWD" >> .env

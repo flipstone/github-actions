@@ -14,7 +14,7 @@ runs:
   using: composite
   steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set Output
       id: set-output
@@ -26,4 +26,3 @@ runs:
         files=(stack-ghc*.yaml)
         json=$(jq --null-input --compact-output '$ARGS.positional' --args "${files[@]}")
         echo "stack-yamls=$json" >> "$GITHUB_OUTPUT"
-    

@@ -1,0 +1,115 @@
+name: Release
+
+# Downstream repositories pin these composite actions by commit sha, and rely on
+# Dependabot to move that pin. Dependabot can only do that by comparing a sha
+# against tags, so a repository with no tags gets no bump PRs at all -- silently,
+# with no error and nothing in the Dependabot tab to suggest anything is wrong.
+# This workflow mints a tag per push to main that actually changes an action.
+#
+# See README.md for the tag format and what downstream repositories should pin.
+
+on:
+  push:
+    branches:
+      - main
+  # The commit that introduces this workflow touches only .github/, so the gate
+  # below correctly declines to release it and there would otherwise never be a
+  # first tag. Dispatch manually once to bootstrap.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Publish a release tag
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # The gate diffs against the previous commit and the tag is derived
+          # from the commit date, so a shallow single-commit clone is not enough.
+          fetch-depth: 0
+
+      - name: Decide whether this push changed an action
+        id: gate
+        run: |
+          set -o errexit
+
+          if [ '${{ github.event_name }}' = 'workflow_dispatch' ]; then
+            echo "Manual run: releasing regardless of what changed."
+            echo 'release=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          before='${{ github.event.before }}'
+
+          # An unknown before-sha (force push, newly created branch) errs on the
+          # side of releasing.
+          if ! git cat-file -e "$before" 2>/dev/null; then
+            echo "Unknown before-sha $before: releasing."
+            echo 'release=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # What downstream repositories consume is the composite action
+          # directories, so those are what a release should track. Deriving the
+          # list from the action.yaml files present means a third action added
+          # later is covered without anyone remembering to edit this workflow --
+          # and that a README- or CI-only merge mints nothing, rather than
+          # opening a no-op bump PR in a dozen repositories.
+          changed=$(git diff --name-only "$before" HEAD)
+          echo "Changed paths:"
+          echo "$changed" | awk '{ print "  " $0 }'
+
+          release=false
+          while read -r dir; do
+            [ -n "$dir" ] || continue
+            if echo "$changed" | grep -q "^$dir/"; then
+              echo "Action changed: $dir"
+              release=true
+            fi
+          done < <(git ls-files '*/action.yaml' '*/action.yml' | xargs -r -n1 dirname | sort -u)
+
+          if [ "$release" = false ]; then
+            echo "No action directory changed; skipping release."
+          fi
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release tag
+        if: steps.gate.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o errexit
+
+          # The date is the commit's, not today's. A wall-clock date would let a
+          # re-run of an old workflow mint a tag that sorts above newer releases
+          # while pointing at older code; with the commit date, a re-run
+          # recreates the identical tag and the guard below makes it a no-op.
+          #
+          # Year first because a bare run number stops comparing correctly at
+          # 1000 (dependabot-core#11198), and leading with the 4-digit year
+          # avoids that permanently. Month and day are unpadded on purpose --
+          # Dependabot compares version segments numerically, so 2026.8.6 is
+          # what it wants, not 2026.08.06.
+          commit_date=$(TZ=UTC git show -s --format=%cd --date=format-local:%Y.%-m.%-d HEAD)
+          tag="v$commit_date.${{ github.run_number }}"
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists (this is a re-run); nothing to do."
+            exit 0
+          fi
+
+          echo "Publishing $tag at $GITHUB_SHA"
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$tag" \
+            --notes "Automated release of $GITHUB_SHA."

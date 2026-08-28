@@ -1,0 +1,27 @@
+# Keep the actions this repository itself uses up to date.
+#
+# This library exists so that consuming repositories can track it with
+# Dependabot, so it should hold itself to the same standard: `actions/checkout`
+# is pinned in two places here, and the commit that last moved it (2c1f2781,
+# "Update checkout action to latest major version, v6") is exactly the kind of
+# change that should have arrived as a bump PR rather than being noticed by hand.
+#
+# Directories are listed explicitly because the github-actions ecosystem scans
+# `.github/workflows` for "/" but needs a separate entry per composite action to
+# see that action's own `action.yaml`. Both action directories are listed even
+# though only find-stack-ghc-yamls currently has a `uses:`, so that adding one to
+# setup-dockerized-stack later is covered without editing this file.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+      - "/find-stack-ghc-yamls"
+      - "/setup-dockerized-stack"
+    schedule:
+      interval: "weekly"
+    # One PR for all action bumps rather than one PR per action.
+    groups:
+      github-actions:
+        patterns:
+          - "*"

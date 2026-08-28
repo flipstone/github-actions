@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           # The gate diffs against the previous commit and the tag is derived
           # from the commit date, so a shallow single-commit clone is not enough.

@@ -16,6 +16,7 @@ updates:
   - package-ecosystem: "github-actions"
     directories:
       - "/"
+      - "/copy-repo-files"
       - "/find-stack-ghc-yamls"
       - "/setup-dockerized-stack"
     schedule:

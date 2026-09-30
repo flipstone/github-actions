@@ -4,9 +4,30 @@ Flipstone github actions library.
 
 ## Actions
 
+- `copy-repo-files` — copies selected files and directories from another
+  repository into the workspace.
 - `find-stack-ghc-yamls` — finds the `stack*.yaml` files in a repository, for
   building a multi-GHC test matrix.
 - `setup-dockerized-stack` — sets up a dockerized stack environment.
+
+### copy-repo-files
+
+Each line of `files` maps a path in the source repository to a path in the
+workspace. A directory copies its contents into the destination directory.
+
+```yaml
+      - uses: flipstone/github-actions/copy-repo-files@<sha> # <version>
+        with:
+          repository: flipstone/example
+          ref: main
+          token: ${{ secrets.EXAMPLE_READ_TOKEN }}
+          files: |
+            docs/style.md:.github/style.md
+            templates/pull-request:.github/templates
+```
+
+`token` defaults to `github.token`, which can only read the current repository
+and public ones.
 
 ## Releases
 

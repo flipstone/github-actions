@@ -1,0 +1,92 @@
+name: Copy Repo Files
+description: Copies selected files and directories from another repository into the workspace
+
+inputs:
+  repository:
+    description: The repository to copy from, as owner/name
+    required: true
+
+  ref:
+    description: The branch, tag, or sha to copy from. Defaults to the repository's default branch.
+    required: false
+    default: ''
+
+  token:
+    description: A token with read access to the repository
+    required: false
+    default: ${{ github.token }}
+
+  files:
+    description: |
+      One source:destination mapping per line. The source is a file or directory
+      path in the repository. The destination is a path relative to
+      working-directory. A directory source copies its contents into the
+      destination directory.
+    required: true
+
+  working-directory:
+    required: true
+    default: ${{ github.workspace }}
+
+runs:
+  using: composite
+  steps:
+    - name: Parse file mappings
+      id: parse
+      shell: bash
+      env:
+        FILES: ${{ inputs.files }}
+      run: |
+        set -o errexit
+
+        {
+          echo 'sparse-checkout<<COPY_REPO_FILES_EOF'
+          while IFS=: read -r source destination; do
+            [ -n "$source" ] || continue
+            if [ -z "$destination" ]; then
+              echo "::error::Expected source:destination, got: $source" >&2
+              exit 1
+            fi
+            echo "/${source#/}"
+          done <<< "$FILES"
+          echo 'COPY_REPO_FILES_EOF'
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        repository: ${{ inputs.repository }}
+        ref: ${{ inputs.ref }}
+        token: ${{ inputs.token }}
+        path: .copy-repo-files
+        sparse-checkout: ${{ steps.parse.outputs.sparse-checkout }}
+        sparse-checkout-cone-mode: false
+        persist-credentials: false
+
+    - name: Copy files
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        FILES: ${{ inputs.files }}
+        REPOSITORY: ${{ inputs.repository }}
+        CHECKOUT: ${{ github.workspace }}/.copy-repo-files
+      run: |
+        set -o errexit
+
+        while IFS=: read -r source destination; do
+          [ -n "$source" ] || continue
+
+          if [ ! -e "$CHECKOUT/$source" ]; then
+            echo "::error::$source does not exist in $REPOSITORY"
+            exit 1
+          fi
+
+          mkdir -p "$(dirname "$destination")"
+          cp -aT "$CHECKOUT/$source" "$destination"
+          echo "Copied $source to $destination"
+        done <<< "$FILES"
+
+    - name: Remove checkout
+      if: always()
+      shell: bash
+      run: rm -rf "$GITHUB_WORKSPACE/.copy-repo-files"
